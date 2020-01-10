@@ -5,6 +5,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_puzzle/audio/audio.dart';
 import 'package:flutter_puzzle/audio/audio_url.dart';
+import 'package:flutter_puzzle/database/database_helper.dart';
+import 'package:flutter_puzzle/dialogs/dialog.dart';
+import 'package:flutter_puzzle/models/rank.dart';
 import 'package:flutter_puzzle/notifications/my_notification.dart';
 import 'package:flutter_puzzle/widgets/puzzle.dart';
 import 'package:flutter_puzzle/widgets/my_timer.dart';
@@ -17,7 +20,7 @@ class GameRoute extends StatefulWidget {
   GameRouteState createState() => new GameRouteState();
 }
 
-class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
+class GameRouteState extends State<GameRoute> with WidgetsBindingObserver, TickerProviderStateMixin{
 
   List<String> images;
   int index;
@@ -32,11 +35,14 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
   GlobalKey<PuzzleState> puzzleKey;
   GlobalKey<MyTimerState> timerKey;
 
+  TextEditingController _textEditingController;
+  bool isFirst;  //是否第一次进入此页面
+
   @override
   void initState() {
     super.initState();
     images = <String>[R.imagesAJpg, R.imagesBPng, R.imagesCJpg, R.imagesDJpg, R.imagesEJpg];
-    items = ["开始", "暂停", "停止", "等级", "图形", "自选图形"];
+    items = ["开始", "暂停", "停止", "等级", "图形", "自选图形", "排行榜"];
     levels = <String>["初级", "中级", "高级"];
     titles = ["天使战士", "动漫女生", "向日葵女孩", "愤怒的小鸟", "爱拼才会赢"];
     cr = [3, 4, 5];
@@ -44,18 +50,30 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
     puzzleKey = GlobalKey<PuzzleState>();
     timerKey = GlobalKey<MyTimerState>();
 
+    isFirst = true;
     WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    index = (ModalRoute.of(context).settings.arguments as Map<String, dynamic>)["index"];
-    level = (ModalRoute.of(context).settings.arguments as Map<String, dynamic>)["level"];
-    imagePath = (ModalRoute.of(context).settings.arguments as Map<String, dynamic>)["path"];
-    print(imagePath);
-
-
+    if(isFirst) {
+      isFirst = false;
+      index = (ModalRoute
+          .of(context)
+          .settings
+          .arguments as Map<String, dynamic>)["index"];
+      level = (ModalRoute
+          .of(context)
+          .settings
+          .arguments as Map<String, dynamic>)["level"];
+      imagePath = (ModalRoute
+          .of(context)
+          .settings
+          .arguments as Map<String, dynamic>)["path"];
+      //   print(imagePath);
+      print("didChangeDependencies");
+    }
   }
 
   @override
@@ -70,6 +88,7 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
       child: NotificationListener<MyNotification>(
         onNotification: (notification){
           status = 0;
+          _textEditingController = TextEditingController();
           Duration time = timerKey.currentState.pause();
           Future.delayed(Duration(milliseconds: 500)).then((_){
 	          showDialog(
@@ -81,13 +100,28 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
 						          children: <Widget>[
 							          Text("游戏结束！"),
 							          Container(height: 20,),
-							          Text("用时：${time.toString().substring(2, 7)}"),
+							          Text("您的成绩：  ${time.toString().substring(2, 7)}"),
+                        TextField(
+                          controller: _textEditingController,
+                          decoration: InputDecoration(
+                            hintText: "您的昵称"
+                          ),
+                        ),
 						          ],
 					          ),
 					          actions: <Widget>[
 						          FlatButton(
 							          child: Text("确定"),
-							          onPressed: (){
+							          onPressed: () async{
+							            if(_textEditingController.text != ""){
+							              Rank rank = Rank()
+                              ..level = level + 1
+                              ..name = _textEditingController.text
+                              ..score = time.inMilliseconds
+                              ..time = DateTime.now().toString();
+
+							              await DatabaseHelper.instance.insert(rank);
+                          }
                           Audio.instance.loop(AudioUrl.game);
 								          Navigator.of(context).pop();
 							          },
@@ -100,6 +134,7 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
           return false;
         },
         child: Scaffold(
+          resizeToAvoidBottomInset: false,
           body: Container(
             decoration: BoxDecoration(
               image: DecorationImage(
@@ -125,7 +160,7 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
                                   title: Center(child: Text(e)),
                                   enabled: !(level == levels.indexOf(e)),
                                   onTap: (){
-                                    print(e);
+                               //     print(e);
                                     Navigator.of(context).pop();
                                     setState(() {
                                       level = levels.indexOf(e);
@@ -147,7 +182,7 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
                                   title: Center(child: Text(e)),
                                   enabled: !(index == titles.indexOf(e)),
                                   onTap: (){
-                                    print(e);
+                               //     print(e);
                                     Navigator.of(context).pop();
                                     setState(() {
                                       imagePath = null;
@@ -187,7 +222,7 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
                               title: Text(e),
                               enabled: enabled,
                               onTap: (){
-                                print(e);
+                            //    print(e);
                                 Navigator.of(context).pop();
                                 if(e == items[0]){
                                   if(status == 2){
@@ -225,6 +260,8 @@ class GameRouteState extends State<GameRoute> with WidgetsBindingObserver{
                                       Audio.instance.resume();
                                     }
                                   });
+                                }else if(e == items[6]){
+                                  showRankDialog(context, this, levels);
                                 }
                               },
                             );

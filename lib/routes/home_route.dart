@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_puzzle/audio/audio.dart';
 import 'package:flutter_puzzle/audio/audio_url.dart';
+import 'package:flutter_puzzle/database/database_helper.dart';
+import 'package:flutter_puzzle/dialogs/dialog.dart';
 import 'package:flutter_puzzle/widgets/shine_effect.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -11,7 +13,7 @@ class HomeRoute extends StatefulWidget {
   HomeRouteState createState() => HomeRouteState();
 }
 
-class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver{
+class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver, TickerProviderStateMixin{
 
 	int level;
 	List<String> levels;
@@ -27,6 +29,7 @@ class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver{
 
 		title = 0;
 		titles = ["天使战士", "动漫女生", "向日葵女孩", "愤怒的小鸟", "爱拼才会赢"];
+
 
 		Audio.instance.loop(AudioUrl.home);
 		//增加监听生命周期
@@ -89,7 +92,7 @@ class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver{
               ],
             ),
           ),
-			    Container(height: size.height*0.20,),
+			    Container(height: size.height*0.15,),
 			    Column(
 				    crossAxisAlignment: CrossAxisAlignment.start,
 			      children: <Widget>[
@@ -192,6 +195,13 @@ class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver{
 			    OutlineButton(
 				    borderSide: BorderSide(color: Colors.white),
 				    onPressed: ()async{
+					    showRankDialog(context, this, levels);
+				    },
+				    child: Text("排行榜", style: TextStyle(color: Colors.white),),
+			    ),
+			    OutlineButton(
+				    borderSide: BorderSide(color: Colors.white),
+				    onPressed: ()async{
 				    	Audio.instance.pause();
 							await ImagePicker.pickImage(source: ImageSource.gallery).then((value){
 								if(value != null){
@@ -249,6 +259,7 @@ class HomeRouteState extends State<HomeRoute> with WidgetsBindingObserver{
 		Audio.instance.dispose();
 		//移除监听生命周期
 		WidgetsBinding.instance.removeObserver(this);
+		DatabaseHelper.instance.close();
     super.dispose();
   }
 
